@@ -3,10 +3,11 @@ from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import pandas as pd
 import time
 import json
+from multiprocessing import Pool
 import threading
 import asyncio
 
@@ -14,6 +15,12 @@ def set_browser():
     options = webdriver.FirefoxOptions()
     options.add_argument("-headless")
     return webdriver.Firefox(options=options)
+
+def parse_member(member_html):
+    soup = BeautifulSoup(member_html, 'lxml')
+    item = {}
+    item['userHref'] = soup.find('a').attrs['href']
+    return item
 
 def scrape_popular_members(page, browser):
     url = "https://letterboxd.com/members/popular/" if page == 1 else f"https://letterboxd.com/members/popular/page/{page}/"
@@ -25,12 +32,22 @@ def scrape_popular_members(page, browser):
         html = browser.page_source
         soup = BeautifulSoup(html, 'lxml')
         if soup.title.text != "Letterboxd - Not Found":
-            members = soup.find_all("div", class_="person-summary")
+            members_html = [str(member) for member in soup.find_all("div", class_="person-summary")]
+            # threads = []
 
-            for member in members:
-                item = {}
-                item['userHref'] = member.find('a').attrs['href']
-                data.append(item)
+            with ProcessPoolExecutor(max_workers=8) as executor:
+                for item in executor.map(parse_member, members_html):
+                    data.append(item)
+
+            # with Pool(processes=8) as pool:
+            #     for item in pool.imap_unordered(parse_member, members):
+            #         data.append(item)
+
+
+            # for member in members:
+            #     item = {}
+            #     item['userHref'] = member.find('a').attrs['href']
+            #     data.append(item)
 
             # Removing featured popular reviewers on right side of screen on webpage
             data = data[:-5]
@@ -47,12 +64,12 @@ def scrape_popular_members(page, browser):
 
 def main():
     curr_page = 1
-    num_pages = 167
+    num_pages = 40
     data = []
     browser = set_browser()
     t0 = time.time()
 
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
         for curr_page in range(1, num_pages+1):
             futures.append(executor.submit(scrape_popular_members, curr_page, browser))
