@@ -1,53 +1,27 @@
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import pandas as pd
 import time
-import json
-from multiprocessing import Pool
-import threading
 import asyncio
+import aiohttp
 
-def set_browser():
-    options = webdriver.FirefoxOptions()
-    options.add_argument("-headless")
-    return webdriver.Firefox(options=options)
+async def fetch_html(url, session):
+    async with session.get(url) as response:
+        return await response.text()
 
-def parse_member(member_html):
-    soup = BeautifulSoup(member_html, 'lxml')
-    item = {}
-    item['userHref'] = soup.find('a').attrs['href']
-    return item
-
-def scrape_popular_members(page, browser):
+async def scrape_popular_members(page, session):
     url = "https://letterboxd.com/members/popular/" if page == 1 else f"https://letterboxd.com/members/popular/page/{page}/"
-    browser.get(url)
+    html = await fetch_html(url, session)
     data = []
 
     try:
-        WebDriverWait(browser, 10).until(expected_conditions.presence_of_element_located((By.CLASS_NAME, "table-person")))
-        html = browser.page_source
         soup = BeautifulSoup(html, 'lxml')
         if soup.title.text != "Letterboxd - Not Found":
-            members_html = [str(member) for member in soup.find_all("div", class_="person-summary")]
-            # threads = []
+            members = soup.find_all("div", class_="person-summary")
 
-            with ProcessPoolExecutor(max_workers=8) as executor:
-                for item in executor.map(parse_member, members_html):
-                    data.append(item)
-
-            # with Pool(processes=8) as pool:
-            #     for item in pool.imap_unordered(parse_member, members):
-            #         data.append(item)
-
-
-            # for member in members:
-            #     item = {}
-            #     item['userHref'] = member.find('a').attrs['href']
-            #     data.append(item)
+            for member in members:
+                item = {}
+                item['userHref'] = member.find('a').attrs['href']
+                data.append(item)
 
             # Removing featured popular reviewers on right side of screen on webpage
             data = data[:-5]
@@ -62,24 +36,24 @@ def scrape_popular_members(page, browser):
         return data
     
 
-def main():
-    curr_page = 1
-    num_pages = 40
+async def main():
+    num_pages = 167
     data = []
-    browser = set_browser()
+
     t0 = time.time()
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for page in range(1, num_pages+1):
+            tasks.append(scrape_popular_members(page, session))
+        responses = await asyncio.gather(*tasks)
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = []
-        for curr_page in range(1, num_pages+1):
-            futures.append(executor.submit(scrape_popular_members, curr_page, browser))
+    for response in responses:
+        data += response
         
-        for future in futures:
-            data += future.result()
-
-    browser.quit()
     t1=time.time()
-    print(f"{(t1-t0)/60} minutes to scrape data")
+
+    print(f"{(t1-t0)/60} minutes to scrape {num_pages} pages")
 
     df = pd.DataFrame(data)
     df.to_csv("members.csv")
@@ -88,4 +62,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
