@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import asyncio
 import aiohttp
+import os
 
 async def fetch_html(url, session):
     async with session.get(url) as response:
@@ -37,7 +38,7 @@ async def scrape_popular_members(page, session):
     
 
 async def main():
-    num_pages = 167
+    num_pages = 40
     data = []
 
     t0 = time.time()
@@ -57,6 +58,10 @@ async def main():
 
     df = pd.DataFrame(data)
     df.to_csv("members.csv")
+    try:
+        os.rename("members.csv", "data/members.csv")
+    except FileExistsError:
+        os.replace("members.csv", "data/members.csv")
 
     print("Process finished")
 
