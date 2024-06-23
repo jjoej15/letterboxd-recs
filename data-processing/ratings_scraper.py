@@ -3,10 +3,11 @@ import pandas as pd
 import time
 import asyncio
 import aiohttp
+from members_scraper import fetch_html
 
-async def fetch_html(url, session):
-    async with session.get(url) as response:
-        return await response.text()
+# async def fetch_html(url, session):
+#     async with session.get(url) as response:
+#         return await response.text()
     
 
 async def get_num_pages(member, session):
@@ -19,7 +20,7 @@ async def get_num_pages(member, session):
         return int(paginate_pages[-1].find('a').text)
     
     except Exception as err:
-        print(f"Error finding number of pages for member {member}: {err}")
+        print(f"Error finding number of pages to scrape for member {member}: {err}")
 
 
 async def scrape_member_ratings(member, page, session):
@@ -48,10 +49,10 @@ async def scrape_member_ratings(member, page, session):
 
                     data.append(item)
 
-        print(f"Member {member}, page #{page} successfully scraped")
+        print(f"Member {member}, film page #{page} successfully scraped")
 
     except Exception as err:
-        print(f"Error scraping member {member}, page #{page}: {err}")
+        print(f"Error scraping member {member}, film page #{page}: {err}")
 
     finally: 
         return data
@@ -73,8 +74,8 @@ async def main():
         data = []
 
         for line in members_lines:
-            # After every 50 members' ratings are scraped, save progress
-            if count == 50:
+            # After every 100 members' ratings are scraped, save progress
+            if count == 100:
                 df = pd.DataFrame(data)
                 df.to_csv("data/ratings.csv", mode='a')
                 data = []
@@ -101,7 +102,7 @@ async def main():
 
     t1=time.time()
 
-    print(f"{(t1-t0)/60} minutes to scrape {pages_scraped} pages")
+    print(f"{(t1-t0)/60} minutes to scrape {pages_scraped} member film pages")
 
     if len(data) > 0:
         df = pd.DataFrame(data)

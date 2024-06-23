@@ -9,7 +9,7 @@ async def fetch_html(url, session):
         return await response.text()
 
 async def scrape_popular_members(page, session):
-    url = "https://letterboxd.com/members/popular/" if page == 1 else f"https://letterboxd.com/members/popular/page/{page}/"
+    url = f"https://letterboxd.com/members/popular/page/{page}/"
     html = await fetch_html(url, session)
     data = []
 
@@ -25,12 +25,12 @@ async def scrape_popular_members(page, session):
 
             # Removing featured popular reviewers on right side of screen on webpage
             data = data[:-5]
-            print(f'Page #{page} successfully scraped')   
+            print(f'Member page #{page} successfully scraped')   
         else:
-            print(f"Page #{page} not found")
+            print(f"Member page #{page} not found")
 
     except Exception as err:
-        print(f"Error scraping page #{page}: {err}")
+        print(f"Error scraping member page #{page}: {err}")
 
     finally:
         return data
@@ -53,7 +53,7 @@ async def main():
         
     t1=time.time()
 
-    print(f"{(t1-t0)/60} minutes to scrape {num_pages} pages")
+    print(f"{(t1-t0)/60} minutes to scrape {num_pages} member pages")
 
     df = pd.DataFrame(data)
     df.to_csv("data/members.csv")
