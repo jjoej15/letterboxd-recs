@@ -58,7 +58,7 @@ async def main():
     df = pd.DataFrame(data)
     df.to_csv("data/members.csv")
 
-    print("Process finished")
+    print("Members finished scraping")
 
 
 if __name__ == '__main__':

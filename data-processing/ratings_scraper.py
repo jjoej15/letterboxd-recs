@@ -1,3 +1,7 @@
+# TODO: 
+# - Scrape ratings for films user has watched but hasn't rated, using their average rating as the rating
+# - Drop the /film/ in film link since that's the same for every link
+
 from bs4 import BeautifulSoup
 import pandas as pd
 import time
@@ -49,7 +53,7 @@ async def scrape_member_ratings(member, page, session):
 
                     data.append(item)
 
-        print(f"Member {member}, film page #{page} successfully scraped")
+        # print(f"Member {member}, film page #{page} successfully scraped")
 
     except Exception as err:
         print(f"Error scraping member {member}, film page #{page}: {err}")
@@ -92,6 +96,7 @@ async def main():
             # Scraping every page user has filled in ratings
             tasks = []
             for page in range(1, pages + 1):
+                print(f'Scraping member {member}, page {page}. . .')
                 tasks.append(scrape_member_ratings(member, page, session))
             responses = await asyncio.gather(*tasks)
 
@@ -99,6 +104,7 @@ async def main():
                 data += response
 
             pages_scraped += pages
+            print(f'Finished scraping {member}. {pages_scraped} pages scraped so far. . .')
 
     t1=time.time()
 
@@ -108,7 +114,7 @@ async def main():
         df = pd.DataFrame(data)
         df.to_csv("data/ratings.csv", mode='a')
 
-    print("Process finished")
+    print("Ratings finished scraping.")
 
 
 if __name__ == '__main__':
