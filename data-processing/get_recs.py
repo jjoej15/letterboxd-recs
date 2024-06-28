@@ -8,6 +8,8 @@ from surprise import dump, accuracy
 from colorama import Fore
 import time
 
+
+
 popularity_filter_map = {
     # Key represents user input. Value is tuple where first index is the min popularity ranking that
     # the film can be, second index is the max num. of users who've viewed the film can be. 
@@ -37,16 +39,8 @@ genres = [
     "War",
     "Western"
 ]
-
-
-# async def fetch_v2(url, session):
-#     '''
-#     Takes in url and ClientSession object and returns tuple of response status and response text/html
-#     '''
-#     async with session.get(url) as response:
-#         print(response.status)
-#         return (response.status, await response.text())
     
+
 
 async def scrape_user_data(user):
     user_ratings = []
@@ -66,6 +60,8 @@ async def scrape_user_data(user):
             user_ratings += response
 
     return user_ratings
+
+
 
 async def scrape_pred_data(film_link, idx, filters, session):
     film_info = {'idx': idx}
@@ -94,21 +90,17 @@ async def scrape_pred_data(film_link, idx, filters, session):
             soup = BeautifulSoup(html, 'lxml')
             film_genres = [genre.text for genre in soup.find('div', id="tab-genres").find_all('a') if genre.text in genres]
             film_info['genres'] = film_genres
-            # print(film_genres)
             
     finally:
         return film_info
     
 
+
 async def apply_filters(pred_list, filters, n):
     if filters:
-        # film_data_dict = {}
         filtered_list = []
         max_viewers = popularity_filter_map[filters['Popularity']][1] if 'Popularity' in filters else float('inf')
-        # genres_to_choose = genres[int(filters['Genre'])-1] if 'Genre' in filters else genres
         genres_to_choose = [genres[int(genre_input)-1] for genre_input in filters['Genre']] if 'Genre' in filters else genres
-
-        print(genres_to_choose)
 
         async with aiohttp.ClientSession() as session:
             tasks = []
@@ -120,23 +112,14 @@ async def apply_filters(pred_list, filters, n):
                     responses = await asyncio.gather(*tasks)
                     tasks = []
                     for response in responses:
-                        # if 'genres' in response:
-                        #     print(response['genre'])
                         if ('viewers' in response and response['viewers'] > max_viewers) or ('genres' in response and not any(genre in genres_to_choose for genre in response['genres'])):
                             pass
                         else:
-                            # if 'genres' in response:
-                            #     print(response['genres'])
-                            # if 'viewers' in response:
-                            #     print(response['viewers'])
                             filtered_list.append(pred_list[response['idx']])
-                        # film_data_dict.update(response)
 
                 i += 1
 
-        return filtered_list[:n]
-
-        # print(film_data_dict)
+        return sorted(filtered_list, key=(lambda x : x.est), reverse=True)[:n]
 
     else:
         return pred_list[:n]
@@ -177,11 +160,67 @@ async def get_top_n_recs(user, n, df, algo, filters={}):
     return [(pred.iid, pred.est) for pred in filtered_recs]
 
 
+
+def get_blended_ratings(user_1_ratings, user_2_ratings, algo):
+    # Find films user 1 has rated but user 2 hasnt
+    # Predict what user 2 will rate those films
+    # Find films user 2 has rated but user 1 hasn't
+    # Predict what user 1 will rate those films
+    # Return a list of dicts corresponding to the average of the ratings for each film
+    user_1 = user_1_ratings[0]['User']
+    user_2 = user_2_ratings[0]['User']
+
+    to_predict = []
+    combined_ratings = []
+    films_in_common_dict = {}
+
+    user_1_total_score = 0
+    for user_1_rating in user_1_ratings:
+        user_1_total_score += int(user_1_rating['Rating'])
+
+        for user_2_rating in user_2_ratings:
+            if user_1_rating['Film Link'] == user_2_rating['Film Link']:
+                combined_ratings.append(user_1_rating)
+                combined_ratings[-1]['Rating'] = str(round((int(user_1_rating['Rating']) + int(user_2_rating['Rating']))/2, 2))
+                # combined_ratings[-1]['User'] = f'{user_1}, {user_2} blend'
+                films_in_common_dict[user_1_rating['Film Link']] = True
+                break
+
+        # If user 2 hasn't seen film, add to testset
+        if user_1_rating['Film Link'] not in films_in_common_dict:
+            to_predict.append((user_2, user_1_rating['Film Link']))
+    user_1_rating_mean = round(user_1_total_score / len(user_1_ratings), 2)
+
+    user_2_total_score = 0
+    for user_2_rating in user_2_ratings:
+        user_2_total_score += int(user_2_rating['Rating'])
+
+        # If user 1 hasn't seen film, add to testset
+        if user_2_rating['Film Link'] not in films_in_common_dict:
+            to_predict.append((user_1, user_2_rating['Film Link']))
+    user_2_rating_mean = round(user_2_total_score / len(user_2_ratings), 2)
+
+    user_film_pairs = [(user, film, user_1_rating_mean if user == user_1 else user_2_rating_mean) for (user, film) in to_predict]
+    predictions = algo.test(user_film_pairs)
+
+    for pred in predictions:
+        combined_ratings.append({
+                                    'User': user_1, 
+                                    'Film Link': pred.iid,
+                                    'Rating': round(pred.est, 2)
+                                })
+            
+    return combined_ratings
+
+
 async def main():
     ratings_df = pd.read_csv('data/ratings.csv')
     _, algo = dump.load('rec_model.pkl')
+    blend_mode = True if input('Blend mode? (y/n):\n') == 'y' else False
 
-    user = f'/{input("Enter Letterboxd username for film recommendations: ")}/'
+    user_1 = f'/{input("Enter Letterboxd username for film recommendations: ")}/'
+
+    user_2 = f'/{input("Enter 2nd Letterboxd username for blend mode: ")}/' if blend_mode else None
 
     filter_dict = {}
     filters = input("""Would you like any filters (seperate filters by commas e.g. "g,p" if want genre and popularity filters)?
@@ -217,22 +256,27 @@ async def main():
 
     t0 = time.time()
 
-    user_ratings = await scrape_user_data(user)
+    ratings = await scrape_user_data(user_1)
+   
+    if blend_mode:
+        user_2_ratings = await scrape_user_data(user_2)
 
-    print(f'Gathering recs for {user}. . .')
+        ratings = get_blended_ratings(ratings, user_2_ratings, algo)
 
-    user_df = pd.DataFrame(user_ratings)
+    print(f'Gathering recs. . .')
+    
+    user_df = pd.DataFrame(ratings)
     df = pd.concat([user_df, ratings_df])
 
-    recs = await get_top_n_recs(user, 50, df, algo, filter_dict)
+    recs = await get_top_n_recs(user_1, 50, df, algo, filter_dict)
 
     for i, rec in enumerate(recs, 1):
         print(f'{Fore.CYAN}{i}. https://letterboxd.com{rec[0]} {Fore.GREEN}Predicted Rating: {round(rec[1])}{Fore.WHITE}')
 
     t1 = time.time()
     print(t1-t0)
-    # except Exception as err:
-    #     print(f'Exception occurred: {err}')
+
+
 
 async def main_v2():
     async with aiohttp.ClientSession() as session:
