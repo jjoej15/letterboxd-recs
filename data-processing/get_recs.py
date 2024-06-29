@@ -47,11 +47,11 @@ async def get_num_watchlist_pages(user, session):
     url = f'https://letterboxd.com{user}watchlist/'
     (resp_code, html) = await fetch_html(url, session)
 
-    if resp_code == 204: # If this happens, user likely has watchlist privated
+    if resp_code in (204, 403): # If this happens, user likely has watchlist privated
         return None
     elif resp_code != 200:
         while resp_code != 200:
-            (resp_code, html) = fetch_html(url, session)
+            (resp_code, html) = await fetch_html(url, session)
 
     try:
         soup = BeautifulSoup(html, 'lxml')
@@ -68,7 +68,7 @@ async def scrape_watchlist(user, page, session):
     (resp_code, html) = await fetch_html(url, session)
 
     while resp_code != 200:
-        (resp_code, html) = fetch_html(url, session)
+        (resp_code, html) = await fetch_html(url, session)
 
     film_links = []
 
@@ -110,7 +110,7 @@ async def scrape_user_data(user, exclude_watchlist):
             pages = (await asyncio.gather(*tasks))[0]
             if not pages:
                 print("Couldn't scrape user watchlist. Please try unprivating watchlist.")
-                return []
+                return (user_ratings, [])
 
             tasks = [] 
             for page in range(1, pages + 1):
