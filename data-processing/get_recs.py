@@ -1,12 +1,13 @@
 import asyncio
 import aiohttp
-from ratings_scraper import get_num_pages, scrape_member_ratings
+from ratings_scraper import get_num_film_pages, scrape_member_ratings
 from members_scraper import fetch_html
 import pandas as pd
 from bs4 import BeautifulSoup
 from surprise import dump, accuracy
 from colorama import Fore
 import time
+import functools
 
 
 
@@ -39,16 +40,60 @@ genres = [
     "War",
     "Western"
 ]
+
+
+
+async def get_num_watchlist_pages(user, session):
+    url = f'https://letterboxd.com{user}watchlist/'
+    (resp_code, html) = await fetch_html(url, session)
+
+    if resp_code == 204: # If this happens, user likely has watchlist privated
+        return None
+    elif resp_code != 200:
+        while resp_code != 200:
+            (resp_code, html) = fetch_html(url, session)
+
+    try:
+        soup = BeautifulSoup(html, 'lxml')
+        paginate_pages = soup.find_all("li", class_="paginate-page")
+        return int(paginate_pages[-1].find('a').text) if paginate_pages else 1
     
+    except Exception as err:
+        print(f"Error finding number of pages to scrape for user watchlist: {err}")
 
 
-async def scrape_user_data(user):
+
+async def scrape_watchlist(user, page, session):
+    url = f'https://letterboxd.com{user}watchlist/page/{page}/'
+    (resp_code, html) = await fetch_html(url, session)
+
+    while resp_code != 200:
+        (resp_code, html) = fetch_html(url, session)
+
+    film_links = []
+
+    try:
+        soup = BeautifulSoup(html, 'lxml')
+
+        films = soup.find_all('li', class_='poster-container')
+        for film in films:
+            film_links.append(film.find('div').attrs['data-target-link'])
+
+    except Exception as err:
+        print(f"Error scraping {user} watchlist page #{page}: {err}")
+
+    finally:
+        return film_links
+
+
+async def scrape_user_data(user, exclude_watchlist):
     user_ratings = []
+    user_watchlist = []
 
     async with aiohttp.ClientSession() as session:
         print(f'Scraping data for {user}. . .')
         tasks = []
-        tasks.append(get_num_pages(user, session))
+        tasks.append(get_num_film_pages(user, session))
         pages = (await asyncio.gather(*tasks))[0]
 
         tasks = [] 
@@ -59,7 +104,23 @@ async def scrape_user_data(user):
         for response in responses:
             user_ratings += response
 
-    return user_ratings
+        if exclude_watchlist:
+            tasks = []
+            tasks.append(get_num_watchlist_pages(user, session))
+            pages = (await asyncio.gather(*tasks))[0]
+            if not pages:
+                print("Couldn't scrape user watchlist. Please try unprivating watchlist.")
+                return []
+
+            tasks = [] 
+            for page in range(1, pages + 1):
+                tasks.append(scrape_watchlist(user, page, session))
+            responses = await asyncio.gather(*tasks)
+
+            for response in responses:
+                user_watchlist += response
+
+    return (user_ratings, user_watchlist)
 
 
 
@@ -126,7 +187,7 @@ async def apply_filters(pred_list, filters, n):
         
 
 
-async def get_top_n_recs(user, n, df, algo, filters={}):
+async def get_top_n_recs(user, n, df, algo, filters):
     min_rank = popularity_filter_map[filters['Popularity']][0] if 'Popularity' in filters else 0
 
     df['Rating'] = pd.to_numeric(df['Rating'], errors='coerce')
@@ -137,9 +198,11 @@ async def get_top_n_recs(user, n, df, algo, filters={}):
     user_films = set(df[df['User'] == user]['Film Link'].unique())
     all_films = set(df['Film Link'].unique())
     films_too_popular = set(films_df[films_df['Ranking'] < min_rank]['Film Link'].unique())
-
-    # Filtering out films user has seen and films that don't meet popularity filter criteria
-    films = list(all_films - user_films - films_too_popular)
+    films_in_watchlists = set(functools.reduce((lambda a, b : set(a).union(set(b))), filters['Watchlists'])) if filters['Watchlists'] else set()
+    
+    # Filtering out films user has seen, films that don't meet popularity filter criteria, 
+    # and films in user watchlists (if user opted to ignore films in watchlists)
+    films = list(all_films - user_films - films_too_popular - films_in_watchlists)
 
     user_film_pairs = [(user, film, rating_mean) for film in films]
     predictions = algo.test(user_film_pairs)
@@ -216,11 +279,13 @@ def get_blended_ratings(user_1_ratings, user_2_ratings, algo):
 async def main():
     ratings_df = pd.read_csv('data/ratings.csv')
     _, algo = dump.load('rec_model.pkl')
-    blend_mode = True if input('Blend mode? (y/n):\n') == 'y' else False
+    blend_mode = input('Blend mode? (y/n): ') == 'y'
 
     user_1 = f'/{input("Enter Letterboxd username for film recommendations: ")}/'
 
     user_2 = f'/{input("Enter 2nd Letterboxd username for blend mode: ")}/' if blend_mode else None
+
+    exclude_watchlist = input('Exclude films in watchlist? (y/n): ') == 'y'
 
     filter_dict = {}
     filters = input("""Would you like any filters (seperate filters by commas e.g. "g,p" if want genre and popularity filters)?
@@ -256,12 +321,16 @@ async def main():
 
     t0 = time.time()
 
-    ratings = await scrape_user_data(user_1)
+    (ratings, user_1_watchlist) = await scrape_user_data(user_1, exclude_watchlist)
+    watchlists = [user_1_watchlist] if user_1_watchlist else []
    
     if blend_mode:
-        user_2_ratings = await scrape_user_data(user_2)
+        (user_2_ratings, user_2_watchlist) = await scrape_user_data(user_2, exclude_watchlist)
+        watchlists.append(user_2_watchlist)
 
         ratings = get_blended_ratings(ratings, user_2_ratings, algo)
+
+    filter_dict['Watchlists'] = watchlists
 
     print(f'Gathering recs. . .')
     
