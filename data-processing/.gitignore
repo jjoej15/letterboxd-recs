@@ -1,3 +1,6 @@
 /__pycache__
 data/ratings.csv
 data/films.csv
+stats.md
+pickles/rec_model.pkl 
+pickles/model_df.pkl
