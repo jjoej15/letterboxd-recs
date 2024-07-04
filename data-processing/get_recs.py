@@ -101,8 +101,24 @@ async def scrape_user_data(user, exclude_watchlist):
             tasks.append(scrape_member_ratings(user, page, session))
         responses = await asyncio.gather(*tasks)
 
-        for response in responses:
-            user_ratings += response
+        rating_sum = sum(len(rated_data) for rated_data, _ in responses)
+        if rating_sum: # Only store data if user rated any films
+            mean_rating = round(sum(int(data['Rating']) for rated_data, _ in responses for data in rated_data ) / rating_sum, 2)
+            for rated_data, unrated_data in responses:
+                user_ratings += rated_data
+
+                if unrated_data:
+                    for i in range(len(unrated_data)):
+                        unrated_data[i]['Rating'] = mean_rating
+
+                    user_ratings += unrated_data
+
+        else:
+            for _, unrated_data in responses:
+                for i in range(len(unrated_data)):
+                    unrated_data[i]['Ratings'] = 10
+
+                user_ratings += unrated_data
 
         if exclude_watchlist:
             tasks = []
@@ -173,9 +189,7 @@ async def apply_filters(pred_list, filters, n):
                     responses = await asyncio.gather(*tasks)
                     tasks = []
                     for response in responses:
-                        if ('viewers' in response and response['viewers'] > max_viewers) or ('genres' in response and not any(genre in genres_to_choose for genre in response['genres'])):
-                            pass
-                        else:
+                        if not ('viewers' in response and response['viewers'] > max_viewers) or ('genres' in response and not any(genre in genres_to_choose for genre in response['genres'])):
                             filtered_list.append(pred_list[response['idx']])
 
                 i += 1
@@ -194,6 +208,7 @@ async def get_top_n_recs(user, n, df, algo, filters):
     rating_mean = df.loc[:, 'Rating'].mean()
 
     films_df = pd.read_csv('data/films.csv')
+    films_df['Ranking'] = pd.to_numeric(films_df['Ranking'], errors='coerce')
 
     user_films = set(df[df['User'] == user]['Film Link'].unique())
     all_films = set(df['Film Link'].unique())
@@ -210,26 +225,20 @@ async def get_top_n_recs(user, n, df, algo, filters):
 
     top_1000_recs = sorted(predictions, key=(lambda x : x.est), reverse=True)[:1000]
 
-    # t0 = time.time()
-
     print('Applying filters. . .')
 
     filtered_recs = await apply_filters(top_1000_recs, filters, n)
-
-    # t1 = time.time()
-
-    # print(f'Scraped 600 pages in {(t1-t0)/60} minutes. That\'s {1/((600)/((t1-t0)/60))} mins/pg.')
 
     return [(pred.iid, pred.est) for pred in filtered_recs]
 
 
 
 def get_blended_ratings(user_1_ratings, user_2_ratings, algo):
-    # Find films user 1 has rated but user 2 hasnt
+   # Find films user 1 has rated but user 2 hasnt
     # Predict what user 2 will rate those films
     # Find films user 2 has rated but user 1 hasn't
     # Predict what user 1 will rate those films
-    # Return a list of dicts corresponding to the average of the ratings for each film
+    # Return a list of dicts corresponding to the average of the ratings for each film 
     user_1 = user_1_ratings[0]['User']
     user_2 = user_2_ratings[0]['User']
 
@@ -245,7 +254,6 @@ def get_blended_ratings(user_1_ratings, user_2_ratings, algo):
             if user_1_rating['Film Link'] == user_2_rating['Film Link']:
                 combined_ratings.append(user_1_rating)
                 combined_ratings[-1]['Rating'] = str(round((int(user_1_rating['Rating']) + int(user_2_rating['Rating']))/2, 2))
-                # combined_ratings[-1]['User'] = f'{user_1}, {user_2} blend'
                 films_in_common_dict[user_1_rating['Film Link']] = True
                 break
 
@@ -277,92 +285,82 @@ def get_blended_ratings(user_1_ratings, user_2_ratings, algo):
 
 
 async def main():
-    ratings_df = pd.read_csv('data/ratings.csv')
-    _, algo = dump.load('rec_model.pkl')
+    ratings_df = pd.read_pickle('pickles/model_df.pkl')
+    _, algo = dump.load('pickles/rec_model.pkl')
     blend_mode = input('Blend mode? (y/n): ') == 'y'
 
     user_1 = f'/{input("Enter Letterboxd username for film recommendations: ")}/'
 
     user_2 = f'/{input("Enter 2nd Letterboxd username for blend mode: ")}/' if blend_mode else None
 
-    exclude_watchlist = input('Exclude films in watchlist? (y/n): ') == 'y'
+    try:
+        exclude_watchlist = input('Exclude films in watchlist? (y/n): ') == 'y'
 
-    filter_dict = {}
-    filters = input("""Would you like any filters (seperate filters by commas e.g. "g,p" if want genre and popularity filters)?
-                        "n" - no
-                        "p" - popularity filter
-                        "g" - genre filter\n""").split(',')
-    if 'p' in filters:
-        filter_dict['Popularity'] = input("""What popularity filter (1/2/3)?
-                                          "1" - less known films
-                                          "2" - even lesser known films
-                                          "3" - unknown films\n""")
-    if 'g' in filters:
-        filter_dict['Genre'] = input("""What genres (seperate by commas if want multiple)?
-                                     "1" - Action
-                                     "2" - Adventure
-                                     "3" - Animation
-                                     "4" - Comedy
-                                     "5" - Crime
-                                     "6" - Documentary
-                                     "7" - Drama
-                                     "8" - Family
-                                     "9" - Fantasy
-                                     "10" - History
-                                     "11" - Horror
-                                     "12" - Music
-                                     "13" - Mystery
-                                     "14" - Romance
-                                     "15" - Science Fiction
-                                     "16" - Thriller
-                                     "17" - TV Movie
-                                     "18" - War
-                                     "19" - Western\n""").split(',')
+        filter_dict = {}
+        filters = input("""Would you like any filters (seperate filters by commas e.g. "g,p" if want genre and popularity filters)?
+                            "n" - no
+                            "p" - popularity filter
+                            "g" - genre filter\n""").split(',')
+        if 'p' in filters:
+            filter_dict['Popularity'] = input("""What popularity filter (1/2/3)?
+        "1" - less known films
+        "2" - even lesser known films
+        "3" - unknown films\n""")
+        if 'g' in filters:
+            filter_dict['Genre'] = input("""What genres (seperate by commas if want multiple)?
+        "1" - Action
+        "2" - Adventure
+        "3" - Animation
+        "4" - Comedy
+        "5" - Crime
+        "6" - Documentary
+        "7" - Drama
+        "8" - Family
+        "9" - Fantasy
+        "10" - History
+        "11" - Horror
+        "12" - Music
+        "13" - Mystery
+        "14" - Romance
+        "15" - Science Fiction
+        "16" - Thriller
+        "17" - TV Movie
+        "18" - War
+        "19" - Western\n""").split(',')
 
-    t0 = time.time()
+        t0 = time.time()
 
-    (ratings, user_1_watchlist) = await scrape_user_data(user_1, exclude_watchlist)
-    watchlists = [user_1_watchlist] if user_1_watchlist else []
-   
-    if blend_mode:
-        (user_2_ratings, user_2_watchlist) = await scrape_user_data(user_2, exclude_watchlist)
-        watchlists.append(user_2_watchlist)
+        (ratings, user_1_watchlist) = await scrape_user_data(user_1, exclude_watchlist)
+        watchlists = [user_1_watchlist] if user_1_watchlist else []
 
-        ratings = get_blended_ratings(ratings, user_2_ratings, algo)
+        if blend_mode:
+            (user_2_ratings, user_2_watchlist) = await scrape_user_data(user_2, exclude_watchlist)
+            watchlists.append(user_2_watchlist)
 
-    filter_dict['Watchlists'] = watchlists
+            ratings = get_blended_ratings(ratings, user_2_ratings, algo)
 
-    print(f'Gathering recs. . .')
-    
-    user_df = pd.DataFrame(ratings)
-    df = pd.concat([user_df, ratings_df])
+        filter_dict['Watchlists'] = watchlists
 
-    recs = await get_top_n_recs(user_1, 50, df, algo, filter_dict)
+        print(f'Gathering recs. . .')
+        
+        user_df = pd.DataFrame(ratings)
+        df = pd.concat([user_df, ratings_df])
 
-    for i, rec in enumerate(recs, 1):
-        print(f'{Fore.CYAN}{i}. https://letterboxd.com{rec[0]} {Fore.GREEN}Predicted Rating: {round(rec[1])}{Fore.WHITE}')
+        recs = await get_top_n_recs(user_1, 50, df, algo, filter_dict)
 
-    t1 = time.time()
-    print(t1-t0)
+        print('Recommendations: ')
+        for rec in recs:
+            film_name = df[df['Film Link'] == rec[0]]['Film'].unique()[0]
 
+            print(f'{Fore.YELLOW}{film_name} {Fore.CYAN}https://letterboxd.com{rec[0]} {Fore.GREEN}{Fore.WHITE}')
 
+        t1 = time.time()
+        print(t1-t0)
 
-async def main_v2():
-    async with aiohttp.ClientSession() as session:
-        # with open('output.txt', 'a') as file:
-        #     lines = (await scrape_film_data('/film/inside-out-2-2024/', session)).split('\n')
-        #     for line in lines:
-        #         try:
-        #             file.write(line)
-        #         except:
-        #             pass
-
-
-        print(await scrape_pred_data('/film/the-lord-of-the-rings-2003/', 1, session))
+    except Exception as err:
+        print(f"Couldn't get recommendations for {user_1}{f" and {user_2}" if user_2 else ''}. Make sure usernames are correct and try again. {err}")
 
 
 
 if __name__ == '__main__':
-    # print('Starting. . .')
     asyncio.run(main())
-    # asyncio.run(main_v2())

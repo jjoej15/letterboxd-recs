@@ -5,13 +5,21 @@ import asyncio
 import aiohttp
 
 async def fetch_html(url, session):
+    '''
+    Takes in url and ClientSession object and returns tuple of response status and response text/html
+    '''
     async with session.get(url) as response:
-        return await response.text()
+        return (response.status, await response.text())
 
 async def scrape_popular_members(page, session):
     url = f"https://letterboxd.com/members/popular/page/{page}/"
-    html = await fetch_html(url, session)
+    (resp_code, html) = await fetch_html(url, session)
     data = []
+
+    attempts = 0
+    while resp_code != 200 and attempts < 100:
+        (resp_code, html) = await fetch_html(url, session)
+        attempts += 1
 
     try:
         soup = BeautifulSoup(html, 'lxml')
