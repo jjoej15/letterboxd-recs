@@ -1,7 +1,3 @@
-# TODO: 
-# - Scrape ratings for films user has watched but hasn't rated, using their average rating as the rating
-# - Drop the /film/ in film link since that's the same for every link
-
 from bs4 import BeautifulSoup
 import pandas as pd
 import time
@@ -18,7 +14,13 @@ async def get_num_film_pages(member, session):
         (resp_code, html) = await fetch_html(url, session)
         attempts += 1
 
+    # if resp_code != 200:
+    #     raise Exception(f"Response code {resp_code}")
+
     try:
+        if resp_code != 200:
+            raise Exception(f"Response code {resp_code}")
+
         soup = BeautifulSoup(html, 'lxml')
         paginate_pages = soup.find_all("li", class_="paginate-page")
         return int(paginate_pages[-1].find('a').text) if paginate_pages else 1
@@ -90,11 +92,11 @@ async def scrape_member_ratings(member, page, session):
 async def main():
     pages_scraped = 0
 
-    with open("data/test-members.csv") as fh:
+    with open("data/members.csv") as fh:
         fh.readline()
         members_lines = fh.readlines()
 
-    open("data/test-ratings.csv", "w").close()
+    open("data/ratings.csv", "w").close()
 
     t0 = time.time()
 
@@ -106,37 +108,44 @@ async def main():
             # After every 100 members' ratings are scraped, save progress
             if count == 100:
                 df = pd.DataFrame(data)
-                df.to_csv("data/test-ratings.csv", mode='a')
+                df.to_csv("data/ratings.csv", mode='a')
                 data = []
                 count = 0
 
             tasks = []
             member = line.split(',')[1].strip()
 
-            # Get number of pages user has filled in ratings
-            tasks.append(get_num_film_pages(member, session))
-            pages = (await asyncio.gather(*tasks))[0]
-            pages_scraped += 1
-            
-            # Scraping every page user has filled in ratings
-            tasks = []
-            for page in range(1, pages + 1):
-                print(f'Scraping member {member}, page {page}. . .')
-                tasks.append(scrape_member_ratings(member, page, session))
-            responses = await asyncio.gather(*tasks)
+            try:
+                # Get number of pages user has filled in ratings
+                tasks.append(get_num_film_pages(member, session))
+                pages = (await asyncio.gather(*tasks))[0]
+                pages_scraped += 1
+                
+                # Scraping every page user has filled in ratings
+                tasks = []
+                for page in range(1, pages + 1):
+                    print(f'Scraping member {member}, page {page}. . .')
+                    tasks.append(scrape_member_ratings(member, page, session))
+                responses = await asyncio.gather(*tasks)
 
-            mean_rating = round(sum(int(data['Rating']) for rated_data, _ in responses for data in rated_data ) / sum(len(rated_data) for rated_data, _ in responses), 2)
-            for rated_data, unrated_data in responses:
-                data += rated_data
+                rating_sum = sum(len(rated_data) for rated_data, _ in responses)
+                if rating_sum: # Only store data if user rated any films
+                    mean_rating = round(sum(int(data['Rating']) for rated_data, _ in responses for data in rated_data ) / rating_sum, 2)
+                    for rated_data, unrated_data in responses:
+                        data += rated_data
 
-                if unrated_data:
-                    for i in range(len(unrated_data)):
-                        unrated_data[i]['Rating'] = mean_rating
+                        if unrated_data:
+                            for i in range(len(unrated_data)):
+                                unrated_data[i]['Rating'] = mean_rating
 
-                    data += unrated_data
+                            data += unrated_data
 
-            pages_scraped += pages
-            print(f'Finished scraping {member}. {pages_scraped} pages scraped so far. . .')
+                pages_scraped += pages
+                print(f'Finished scraping {member}. {pages_scraped} pages scraped so far. . .')
+
+            except Exception as err:
+                print(f'Error caught member {member}: {err}')
+
 
     t1=time.time()
 
@@ -144,7 +153,7 @@ async def main():
 
     if len(data) > 0:
         df = pd.DataFrame(data)
-        df.to_csv("data/test-ratings.csv", mode='a')
+        df.to_csv("data/ratings.csv", mode='a')
 
     print("Ratings finished scraping.")
 

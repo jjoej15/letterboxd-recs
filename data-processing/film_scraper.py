@@ -12,7 +12,7 @@ async def scrape_films_page(page, session):
     film_num = (72 * (page-1))
 
     url = f'https://letterboxd.com/films/ajax/popular/page/{page}/'
-    html = await fetch_html(url, session)
+    html = (await fetch_html(url, session))[1]
     data = []
 
     # print(html)
@@ -28,7 +28,7 @@ async def scrape_films_page(page, session):
             # If server response error, wait 5 seconds and try again
             while not soup.find('div', class_='pagination') and attempts < 5:
                 time.sleep(5)
-                html = await fetch_html(url, session)
+                html = (await fetch_html(url, session))[1]
                 soup = BeautifulSoup(html, 'lxml')
                 films = soup.find_all("li", class_="listitem poster-container")
                 attempts += 1
@@ -48,7 +48,7 @@ async def scrape_films_page(page, session):
 
             data.append(item)
 
-        print(f'Scraped film page #{page}. . .')
+        print(f'Scraped film page #{page}')
 
     except Exception as err:
         print(f'Error scraping page film page #{page}: {err}')
@@ -70,7 +70,6 @@ async def main():
         all_films_scraped = False
 
         while not all_films_scraped:
-            # print(page-1)
             # Dump data every 1000 pages scraped
             if page != 1 and (page - 1) % 1000 == 0:
                 # print('hi')
