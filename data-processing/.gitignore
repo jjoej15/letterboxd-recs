@@ -4,3 +4,4 @@ data/films.csv
 stats.md
 pickles/rec_model.pkl 
 pickles/model_df.pkl
+config.py
