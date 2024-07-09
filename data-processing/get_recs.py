@@ -2,14 +2,14 @@ import asyncio
 import aiohttp
 from ratings_scraper import get_num_film_pages, scrape_member_ratings
 from members_scraper import fetch_html
+from pickles import join_pickles
 import pandas as pd
 from bs4 import BeautifulSoup
 from surprise import dump, accuracy
 from colorama import Fore
 import time
 import functools
-
-
+import pickle
 
 popularity_filter_map = {
     # Key represents user input. Value is tuple where first index is the min popularity ranking that
@@ -285,8 +285,13 @@ def get_blended_ratings(user_1_ratings, user_2_ratings, algo):
 
 
 async def main():
-    ratings_df = pd.read_pickle('pickles/model_df.pkl')
-    _, algo = dump.load('pickles/rec_model.pkl')
+    ratings_df = pickle.loads(join_pickles('model_df'))
+    algo = pickle.loads(join_pickles('rec_model'))
+    print(type(algo))
+    print(type(ratings_df))
+    # with open('pickles/rec_model.pkl', 'rb') as algo_file:
+    #     algo = pickle.load(algo_file)
+
     blend_mode = input('Blend mode? (y/n): ') == 'y'
 
     user_1 = f'/{input("Enter Letterboxd username for film recommendations: ")}/'

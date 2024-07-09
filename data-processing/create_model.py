@@ -3,7 +3,7 @@ from surprise import SVD, Reader, Dataset, accuracy, dump
 import time
 import random
 from joblib import Parallel, delayed
-
+import pickle
 
 def sample_ratings(user, user_ratings, n=200):
     print(f'Sampling user {user}. . .')
@@ -51,7 +51,10 @@ def main():
     algo = SVD()
     algo.fit(trainset)
 
-    dump.dump('pickles/rec_model.pkl', algo=algo, verbose=1)
+    # Dumping algorithm to pickle file
+    with open('pickles/rec_model.pkl', 'wb') as file:
+        pickle.dump(algo, file)
+    # dump.dump('pickles/rec_model.pkl', algo=algo, verbose=1)
 
     t1 = time.time()
     print((t1-t0)/60, 'mins to build model.')
