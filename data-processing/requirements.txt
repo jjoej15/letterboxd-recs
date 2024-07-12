@@ -1,0 +1,8 @@
+aiohttp==3.9.5
+beautifulsoup4==4.12.3
+colorama==0.4.6
+joblib==1.4.2
+pandas==2.2.2
+pymongo==4.8.0
+scikit_surprise==1.1.4
+lxml==5.2.2

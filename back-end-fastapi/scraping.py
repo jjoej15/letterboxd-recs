@@ -106,7 +106,7 @@ async def scrape_member_ratings(member, page, session):
 
                     rated_data.append(item)
 
-                else: # # If got rating of 16, it means the user liked the film but didn't rate it. Add to unrated data.
+                else: # If got rating of 16, it means the user liked the film but didn't rate it. Add to unrated data.
                     item = {}
                     item['User'] = member
                     film_info = film.find('div')
