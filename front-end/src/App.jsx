@@ -1,15 +1,23 @@
-import { useEffect, useState } from 'react'
-import './css/App.css'
-import GenreDropdown from './components/GenreDropdown'
+import { useState } from 'react'
+import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCaretDown, faCheck } from '@fortawesome/free-solid-svg-icons'
 import githubLogo from './assets/github-mark.svg';
+import './css/App.css'
+import GenreDropdown from './components/GenreDropdown'
+
 
 function App() {
-  const [mode, setMode] = useState('solo')
-  const [excludeWatchlist, setExcludeWatchlist] = useState(true)
-  const [popularityFilter, setPopularityFilter] = useState()
-  const [genreFilters, setGenreFilters] = useState([])
+  const [mode, setMode] = useState('solo');
+  const [excludeWatchlist, setExcludeWatchlist] = useState(true);
+  const [popularityFilter, setPopularityFilter] = useState();
+  const [genreFilters, setGenreFilters] = useState([]);
+  const [user1, setUser1] = useState();
+  const [user2, setUser2] = useState();
+  const [isLoading, setIsLoading] = useState(false);
+  const [recs, setRecs] = useState();
+  const [errOccured, setErrOccured] = useState(false);
+  const [clicked, setClicked] = useState(false);
 
   const handlePopularityClick = (pop) => {
     if (popularityFilter === pop) {
@@ -20,12 +28,38 @@ function App() {
       setPopularityFilter(pop)
     }
   }
+
+  const handleSubmit = async() => {
+    try {
+      setRecs(null)
+      setIsLoading(true);
+      setErrOccured(false);
+      setClicked(true);
+      const api_url = `http://localhost:8080/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
+
+      const response = await axios.get(api_url);
+      const data = await response.data; 
+      setRecs(data)  
+
+    } catch (error) {
+      console.error(error);
+      setErrOccured(true);
+
+    } finally {
+      setClicked(false);
+      setIsLoading(false);
+    }
+
+  }
   
   return (
     <div className='app'>
       <div className='app-flexbox'>
         <h1 className='app-title'>Letterboxd Recommendations</h1>
 
+        <p className='credits'>Project by Joe Anderson <a href="https://github.com/jjoej15" target="_blank"><img src={githubLogo} className='github-logo' alt='github logo' /></a>. 
+          Source code located <a href="https://github.com/jjoej15/letterboxd-recs" target="_blank">here</a>.</p>
+      
         <p className='app-desc'>Get film recomendations for any Letterboxd user. 
           Find a film to watch with a friend using Blend mode. Watchlists must be public to exclude films in watchlist. 
           May experience delays when applying genre filters. </p>
@@ -33,29 +67,27 @@ function App() {
 
         <div className='mode-buttons'>
           <button className={mode === 'solo' ? 'mode-btn-clicked' : 'mode-btn'} id='solo-mode-btn' onClick={() => setMode('solo')}>
-            {mode === 'solo' ? <u>Solo</u> : 'Solo'}</button>
+            Solo</button>
 
           <button className={mode === 'blend' ? 'mode-btn-clicked' : 'mode-btn'} id='blend-mode-btn' onClick={() => setMode('blend')}>
-            {mode === 'blend' ? <u>Blend</u> : 'Blend'}</button>
+            Blend</button>
         </div> 
 
-        <form className='form'>
+        <div className='form' >
           <div className='users'>
-            <input type='text' className='user-input' placeholder='Enter Username' />
+            <input type='text' className='user-input' placeholder='Enter Username' spellCheck='false' onChange={(u) => setUser1(u.target.value)} />
 
-            {mode === 'blend' && <input type='text' className='user-input' placeholder='Enter Username' />}         
+            {mode === 'blend' && <input type='text' className='user-input'  placeholder='Enter Username' spellCheck='false' onChange={(u) => setUser2(u.target.value)} />}         
           </div>
 
           <div id='exclude-btn'>
             <label>
-              <input type='checkbox' name='exclude-watchlist-btn' defaultChecked></input> 
+              <input type='checkbox' name='exclude-watchlist-btn' onClick={(e) => setExcludeWatchlist(e.target.checked)} defaultChecked></input> 
               <p>Exclude films in watchlist</p>
             </label> 
           </div>
 
           <div className='filters'>
-            {/* <label htmlFor='filter-dropdowns'>Filters: </label> */}
-
             <div className='dropdown'>
               <button className='filter-dropdown-title'>
                 <p>Popularity</p>
@@ -80,32 +112,35 @@ function App() {
             </div>
           </div>
 
-          <button type='submit' className='submit-btn'>Get Recs</button>
-        </form>
+          <button type='submit' className='submit-btn' onClick={user1 !== undefined && !clicked ? handleSubmit : undefined}>Get Recs</button>
+        </div>
 
-        {/* <p className='process-status'>
-          Scraping data for jjoejj. . .
-        </p>
+        <div className='results'>
+          {isLoading && 
+          <div className='process-status'>
+            {isLoading && <div className="loading" />}
 
-        <div className='rec-container'>
-          <h3 className='rec-header'>Recommendations</h3>
+            <p>Gathering recs for {mode === 'blend' ? `${user1} and ${user2}` : user1}</p>
+          </div>}
 
-          <ul className='rec-list'>
-            <li>shawshank redemption</li>
-            <li>parasite</li>
-          </ul>
-        </div> */}
+          {errOccured && 
+          <div className='process-status'>
+            <p>Error occured. Please make sure username is spelled correctly and try again.</p>
+          </div>}
+
+          {recs && 
+          <div className='rec-container'>
+            <h3 className='rec-header'>Recommendations</h3>
+
+            <ul className='rec-list'>
+              {recs.map((rec) => <li key={rec['Link']}><a href={rec['Link']} target="_blank">{rec['Film']}</a></li>)}
+            </ul>
+          </div>}        
+        </div>
+
+        <div className='spacer' />
       </div>
-
-      {/* <p className='app-desc'>Lorem ipsum dolor sit amet consectetur adipisicing elit. Necessitatibus illo consequuntur voluptate aut sint iste ea, dolor doloribus. Necessitatibus exercitationem ratione nam corrupti sint fugit velit distinctio voluptates impedit deleniti.</p> */}
-
-
-      <footer className="footer">
-          <p>Project by Joe Anderson <a href="https://github.com/jjoej15" target="_blank"><img src={githubLogo} className='github-logo' alt='github logo' /></a>. 
-            Source code located <a href="https://github.com/jjoej15/letterboxd-recs" target="_blank">here</a>.</p>
-      </footer> 
     </div>
-
   );
 }
 

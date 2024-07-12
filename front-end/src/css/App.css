@@ -14,28 +14,22 @@ body {
   color: black;
 }
 
-.app{
+.app {
   height: 100vh;
   display: flex;
-
   justify-content: center;
 }
-
-
 
 .app-flexbox {
   display: flex;
   flex-direction: column;
-  /* max-width: 100%; */
   width: 50%;
-  /* justify-content: center; */
   text-align: center;
 }
 
 .filters {
   display: flex;
   justify-content: center;
-  /* margin-bottom: 2.5%; */
   line-height: 100%;
   margin-bottom: 20px;
 }
@@ -46,10 +40,7 @@ body {
   margin-left: 10px;
   min-width:175px;
   max-width: 175px;
-  /* background-color: white; */
 }
-
-
 
 .filter-dropdown-title {
   background-color: white;
@@ -57,9 +48,6 @@ body {
   display: flex;
   justify-content: center;
   line-height: 100%;
-  /* position: relative; */
-  /* min-width:175px; */
- 
   border: none;
 }
 
@@ -71,9 +59,9 @@ body {
   flex-direction: column;
   display: none;
   position: absolute;
+  z-index: 1;
   width: 175px;
   min-height: 270px;
-  /* transform: translateY(100%); */
   max-height: 270px;
   overflow: auto;
 }
@@ -83,7 +71,6 @@ body {
   width: 100%;
   background-color: white;
   border: none;
-  /* position: fixed; */
   transition: color .075s;
 }
 
@@ -97,8 +84,7 @@ body {
 
 .app-title {
   margin-top: 25px;
-  margin-bottom: 20px;
-  /* margin-bottom: 10px; */
+  margin-bottom: 4px;
   text-align: center;
 }
 
@@ -110,11 +96,10 @@ body {
 
 .mode-buttons {
   height: 60px;
+  min-height: 60px;
   margin-bottom: 20px;
   box-shadow: 5px 5px 15px rgb(179, 179, 179);
   border-radius: 8px;
-  /* display: flex;
-  justify-content: center; */
 }
 
 .mode-btn {
@@ -144,10 +129,8 @@ body {
 }
 
 .form {
-  /* width: 50%; */
   background-color: white;
   color: rgb(66, 66, 66);
-  /* padding: 15px; */
   box-shadow: 5px 5px 15px rgb(179, 179, 179);
   border-radius: 8px;
 }
@@ -195,8 +178,6 @@ body {
   border: none;
   background-color: #FF8000;
   margin-bottom: 20px;
-  /* transform: scale(1.035); */
-  /* transition: transform 0.1s ease-in; */
 }
 
 .submit-btn:hover {
@@ -205,6 +186,56 @@ body {
   transition: transform 0.1s ease-in; 
 }
 
+.results {
+  margin-top: 20px;
+  background-color: white;
+  color: rgb(66, 66, 66);
+  box-shadow: 5px 5px 15px rgb(179, 179, 179);
+  border-radius: 8px; 
+}
+
+.process-status {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  font-size: .95rem;
+  display: flex;
+  justify-content: center;
+  line-height: 100%;
+}
+
+.process-status p {
+  margin-left: 10px;
+  transform: translateY(2px);
+}
+
+.rec-container {
+  margin-top: 15px;
+}
+
+.rec-list {
+  list-style-type: none;
+  margin-bottom: 15px;
+  margin-top: 4px;
+}
+
+.rec-list a:link, .rec-list a:visited {
+  color:rgb(27, 169, 220);
+}
+
+.loading {
+  border: 3px solid #EAF0F6;
+  border-radius: 50%;
+  border-top: 3px solid #FF8000;
+  width: 20px;
+  height: 20px;
+  animation: spinner 1s linear infinite;
+  transform: translateY(-1px);
+}
+
+.film-rec {
+  margin-top: 4px;
+  
+}
 
 .footer {
   position: fixed;
@@ -218,39 +249,52 @@ body {
   max-height: 15.2px;
 }
 
-.footer p {
+.credits p {
   line-height: 100%;
-  /* display: flex;
-  justify-content: center; */
   max-height: 100%;
   height: 100%;
-  /* position: absolute; */
 }
 
-.footer a:link {
-  color:rgb(27, 169, 220);
-}
-
-.footer a:visited {
+.credits a:link, .credits a:visited {
   color:rgb(27, 169, 220);
 }
 
 .github-logo {
   max-height: 100%;
-  height: 14px;
+  height: 16.5px;
   top: 50%;
-  transform: translateY(25%)
-  /* display: none; */
+  transform: translateY(3.5px)
 }
 
+.credits {
+  margin-bottom: 3px;
+  font-size: .9rem;
+}
+
+.spacer {
+  min-height: 25px;
+}
+
+/* Keyframes */
+@keyframes spinner {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Media queries */
 @media all and (max-width: 1000px) {
   .app-flexbox {
     width: 75%
+  }
+  .dropdown-content {
+    min-height: 220px;
+    max-height: 220px;
   }
 }
 
 @media all and (max-width: 500px) {
   .app-flexbox {
     width: auto;
+
   }
 }
