@@ -1,13 +1,20 @@
+'''
+    For creating SVD collaborative filtering model using random samples of scraped Letterboxd user data from data/ratings.csv.
+    Dumps algorithm to pickle file and dumps dataframe of user samples to pickle file to allow usage of model in recommendations.
+'''
+
+from surprise import SVD, Reader, Dataset, accuracy
 import pandas as pd
-from surprise import SVD, Reader, Dataset, accuracy, dump
+from joblib import Parallel, delayed
 import time
 import random
-from joblib import Parallel, delayed
 import pickle
+
 
 def sample_ratings(user, user_ratings, n=200):
     print(f'Sampling user {user}. . .')
     
+    # Taking random samples from user's ratings
     available_indices = list(range(len(user_ratings)))
     sampled_data = []
     i = 0
@@ -26,11 +33,10 @@ def sample_ratings(user, user_ratings, n=200):
     return sampled_data
 
 
-
 def main():
     t0 = time.time()
 
-    # Loading data
+    # Sampling data
     full_df = pd.read_csv('data/ratings.csv')
     results = Parallel(n_jobs=-1)(
         delayed(sample_ratings)(user, full_df[full_df['User'] == user].values.tolist())
@@ -39,8 +45,7 @@ def main():
 
     data = [rating for result in results for rating in result] 
     df = pd.DataFrame(data)
-    df.to_pickle('pickles/model_df.pkl')
-    
+    df.to_pickle('pickles/model_df.pkl') # Dumping dataframe to pickle file to be used with model
     reader = Reader(rating_scale=(1, 10))
     data = Dataset.load_from_df(df[["User", "Film Link", "Rating"]], reader)
 
@@ -54,7 +59,6 @@ def main():
     # Dumping algorithm to pickle file
     with open('pickles/rec_model.pkl', 'wb') as file:
         pickle.dump(algo, file)
-    # dump.dump('pickles/rec_model.pkl', algo=algo, verbose=1)
 
     t1 = time.time()
     print((t1-t0)/60, 'mins to build model.')
@@ -69,8 +73,7 @@ def main():
             accuracy.rmse(predictions_svd)
 
         except Exception as err:
-            print(err)
-
+            print(f'Error testing model: {err}')
 
 
 if __name__ == '__main__':

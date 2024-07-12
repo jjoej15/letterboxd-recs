@@ -1,17 +1,15 @@
+import use_model
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-
-import use_model
-import asyncio
-import pandas as pd
-import pickle
 import uvicorn
 
 app = FastAPI()
 
 origins = [
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "https://letterboxdrecs.netlify.app/",
+    "https://letterboxdrecs.netlify.app"
 ]
 
 app.add_middleware(
@@ -22,20 +20,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/{user}")
-def get_recs(user):
-    with open("pickles/model_df.pkl", 'rb') as pkl:
-        ratings_df = pickle.load(pkl)
+@app.get("/api/")
+async def get_recs(users: str, excludeWatchlist: str, popFilter: str, genreFilters: str):
+    excludeWatchlist = excludeWatchlist.capitalize()
+    genreFilters = genreFilters.split(',') if genreFilters else []
+    blended = True if len(users.split(',')) > 1 else False
+  
+    parameters = {'users': users, 'excludeWatchlist': excludeWatchlist, 'popFilter': popFilter, 'genreFilters': genreFilters, 'blended': blended}
 
-    user = f'/{user}/'
-    user_data = ratings_df[ratings_df['User'] == user]
+    return await use_model.main(parameters)
 
-    if user_data.empty:
-        raise HTTPException(
-            status_code=404, detail=f"User {user} not in database"
-        )
-    
-    return user_data
 
 if __name__ == '__main__':
     uvicorn.run(app, port=8080, host='0.0.0.0')
