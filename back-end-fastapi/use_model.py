@@ -162,8 +162,8 @@ async def main(parameters):
         algo = pickle.load(pkl)
 
     blend_mode = parameters['blended']
-    user_1 = f'/{parameters['users'].split(',')[0]}/'
-    user_2 = f'/{parameters['users'].split(',')[1]}/' if blend_mode else None
+    user_1 = f'/{parameters["users"].split(',')[0]}/'
+    user_2 = f'/{parameters["users"].split(',')[1]}/' if blend_mode else None
     exclude_watchlist = parameters['excludeWatchlist'] == 'True'
     
     filter_dict = {}
@@ -184,7 +184,7 @@ async def main(parameters):
 
     filter_dict['Watchlists'] = watchlists
 
-    print(f'Gathering recs for {user_1}{f' and {user_2}' if user_2 else ''}. . .')
+    print(f"Gathering recs for {user_1}{f' and {user_2}' if user_2 else ''}. . .")
     
     user_df = pd.DataFrame(ratings)
     df = pd.concat([user_df, ratings_df])
