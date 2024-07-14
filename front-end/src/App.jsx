@@ -35,7 +35,7 @@ function App() {
       setIsLoading(true);
       setErrOccured(false);
       setClicked(true);
-      const api_url = `http://localhost:8080/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
+      const api_url = `https://clever-ambition-production.up.railway.app/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
 
       const response = await axios.get(api_url);
       const data = await response.data; 
