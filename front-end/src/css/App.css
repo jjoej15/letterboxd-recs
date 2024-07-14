@@ -5,6 +5,10 @@
   font-family: "Noto Sans";
 }
 
+button {
+  color: black;
+}
+
 body label {
   color: black;
 }
