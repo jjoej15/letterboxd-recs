@@ -18,7 +18,7 @@ Web app that uses web scraping to give film recommendations using an SVD collabo
 
 ### Building Model
 - Decided to use SVD factorization in a collaborative filtering model (popularized for usage in recommendation algorithms by Simon Funk in the [Netflix Prize competition](https://en.wikipedia.org/wiki/Netflix_Prize))
-- Usage of the [Surprise](https://surpriselib.com/) scikit package made creating this algorithm relatively easy, though due to memory constraints I decided to use random samples of 200 ratings from each user, meaning the trainset used by the model had ~1,000,000 ratings in it.
+- Usage of the [Surprise](https://surpriselib.com/) scikit package made creating this algorithm surprisingly easy, though due to memory constraints I decided to use random samples of 200 ratings from each user, meaning the trainset used by the model had ~1,000,000 ratings in it.
 
 ### Running Application
 - Application scrapes user data dynamically when given valid Letterboxd username, includes it in testset with the other user ratings and runs SVD algorithm. Gives 50 recommendations for films user hasn't watched yet based on what films the algorithm predicts the user will rate the highest. 
@@ -26,6 +26,7 @@ Web app that uses web scraping to give film recommendations using an SVD collabo
 - When applying filters, program must scrape info about films dynamically. Algorithm gives 1000 top recommendations, then find the 50 highest ones that also meet the filter conditions. 
 - This is why applying genre filters can cause program to take a long time to run. 
 - When applying popularity filters, most of the work is done already since we have the popularity rankings in films.csv, but some films that weren't listed on Letterboxd's film page can slip through the cracks which is why it's necessary to scrape info about film popularity dynamically as well.
+- Also included option to exclude films in user's watchlist. When checked, application scrapes user watchlist and excludes films in it from being recommended. User watchlist must be unprivated.
 
 ## Technologies Used
 
