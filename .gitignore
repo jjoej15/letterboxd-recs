@@ -1,1 +1,5 @@
 /back-end-fastapi/config.py
+/back-end-fastapi/Dockerfile
+/back-end-fastapi/app/__pycache__
+/back-end-fastapi/app/data
+/back-end-fastapi/app/pickles

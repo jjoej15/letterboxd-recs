@@ -2,7 +2,7 @@
     For usage of recommmendation model. 
 '''
 
-import scraping
+from . import scraping
 import pandas as pd
 import aiohttp
 import asyncio
@@ -66,7 +66,7 @@ async def get_top_n_recs(user, n, df, algo, filters):
     df['Rating'] = pd.to_numeric(df['Rating'], errors='coerce')
     rating_mean = df.loc[:, 'Rating'].mean()
 
-    films_df = pd.read_csv('data/films.csv')
+    films_df = pd.read_csv('app/data/films.csv')
     films_df['Ranking'] = pd.to_numeric(films_df['Ranking'], errors='coerce')
 
     user_films = set(df[df['User'] == user]['Film Link'].unique())
@@ -156,9 +156,9 @@ async def main(parameters):
         Returns list of dicts including film recs and their corresponding links.
     '''
 
-    with open("pickles/model_df.pkl", 'rb') as pkl:
+    with open("app/pickles/model_df.pkl", 'rb') as pkl:
         ratings_df = pickle.load(pkl)
-    with open("pickles/rec_model.pkl", 'rb') as pkl:
+    with open("app/pickles/rec_model.pkl", 'rb') as pkl:
         algo = pickle.load(pkl)
 
     blend_mode = parameters['blended']
