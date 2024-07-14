@@ -75,9 +75,9 @@ function App() {
 
         <div className='form' >
           <div className='users'>
-            <input type='text' className='user-input' placeholder='Enter Username' spellCheck='false' onChange={(u) => setUser1(u.target.value)} />
+            <input type='text' className='user-input' placeholder='Enter Username' spellCheck='false' onChange={(u) => setUser1(u.target.value.trim().toLowerCase())} />
 
-            {mode === 'blend' && <input type='text' className='user-input'  placeholder='Enter Username' spellCheck='false' onChange={(u) => setUser2(u.target.value)} />}         
+            {mode === 'blend' && <input type='text' className='user-input'  placeholder='Enter Username' spellCheck='false' onChange={(u) => setUser2(u.target.value.trim().toLowerCase())} />}         
           </div>
 
           <div id='exclude-btn'>
