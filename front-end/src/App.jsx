@@ -18,6 +18,7 @@ function App() {
   const [recs, setRecs] = useState();
   const [errOccured, setErrOccured] = useState(false);
   const [clicked, setClicked] = useState(false);
+  const [usersFetching, setUsersFetching] = useState([]);
 
   const handlePopularityClick = (pop) => {
     if (popularityFilter === pop) {
@@ -31,10 +32,16 @@ function App() {
 
   const handleSubmit = async() => {
     try {
+      if (!user1 || (mode === 'blend' && !user2)) {
+        throw Error('Undefined usernames');
+      }
+
+      setUsersFetching([user1, user2])
       setRecs(null)
       setIsLoading(true);
       setErrOccured(false);
       setClicked(true);
+
       const api_url = `https://clever-ambition-production.up.railway.app/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
 
       const response = await axios.get(api_url);
@@ -44,12 +51,13 @@ function App() {
     } catch (error) {
       console.error(error);
       setErrOccured(true);
+      setRecs(null);
 
     } finally {
       setClicked(false);
       setIsLoading(false);
+      setUsersFetching([]);
     }
-
   }
   
   return (
@@ -120,12 +128,12 @@ function App() {
           <div className='process-status'>
             {isLoading && <div className="loading" />}
 
-            <p>Gathering recs for {mode === 'blend' ? `${user1} and ${user2}` : user1}</p>
+            <p>Gathering recs for {usersFetching[1] ? `${usersFetching[0]} and ${usersFetching[1]}` : usersFetching[0]}</p>
           </div>}
 
           {errOccured && 
           <div className='process-status'>
-            <p>Error occured. Please make sure username is spelled correctly and try again.</p>
+            <p>Error occured. Please make sure {mode === 'blend' ? 'usernames are' : 'username is'} spelled correctly and try again.</p>
           </div>}
 
           {recs && 
