@@ -36,7 +36,7 @@ function App() {
         throw Error('Undefined usernames');
       }
 
-      setUsersFetching([user1, user2])
+      mode === 'blend' ? setUsersFetching([user1, user2]) : setUsersFetching([user1])
       setRecs(null)
       setIsLoading(true);
       setErrOccured(false);
