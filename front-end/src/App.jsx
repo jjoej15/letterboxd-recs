@@ -44,8 +44,8 @@ function App() {
 
       const api_url = `https://clever-ambition-production.up.railway.app/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
 
-      const response = await axios.get(api_url);
-      const data = await response.data; 
+      const response = await fetch(api_url);
+      const data = await response.json(); 
       setRecs(data)  
 
     } catch (error) {
