@@ -14,7 +14,7 @@ Web app that uses web scraping to give film recommendations using an SVD collabo
 ### Scraping data
 - Scraped ratings data from the 5009 most popular members on Letterboxd. Most of these users had ratings for thousands of films and the total dataset came out to include roughly 13 million ratings.
 - Scraped data about every film's popularity ranking on Letterboxd. This was useful for when a user wants to apply popularity filters on their recommendations. This dataset came out to include ~950k films.
-- Needed to scrape data in a reasonable of time, found writing asynchronous code using the asyncio and aiohttp, an asynchronous HTTP Client/Server, libraries to be the fastest.
+- Needed to scrape data in a reasonable amount of time, found writing asynchronous code using the asyncio and aiohttp libraries to be the fastest.
 
 ### Building Model
 - Decided to use SVD factorization in a collaborative filtering model (popularized for usage in recommendation algorithms by Simon Funk in the [Netflix Prize competition](https://en.wikipedia.org/wiki/Netflix_Prize))
