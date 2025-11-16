@@ -73,6 +73,8 @@ To use the command line version of the application locally, follow these steps:
 3. **Install dependencies**
    ```sh
    cd data-processing
+   python -m venv ./venv
+   .\venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
