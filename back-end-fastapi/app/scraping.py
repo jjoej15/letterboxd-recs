@@ -89,8 +89,7 @@ async def scrape_member_ratings(member, page, session):
         # Parsing data using BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
         
-        films = soup.find_all("li", class_="poster-container")   
-
+        films = soup.find_all("li", class_="griditem")   
         for film in films:
             rating_span = film.find('p').find('span')
 
@@ -179,7 +178,7 @@ async def scrape_watchlist(user, page, session):
         # Getting film info using BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
 
-        films = soup.find_all('li', class_='poster-container')
+        films = soup.find_all('li', class_='griditem')
         for film in films:
             film_links.append(film.find('div').attrs['data-target-link'])
 
@@ -231,7 +230,7 @@ async def scrape_user_data(user, exclude_watchlist):
         else:
             for _, unrated_data in responses:
                 for i in range(len(unrated_data)):
-                    unrated_data[i]['Ratings'] = 10
+                    unrated_data[i]['Rating'] = 10
 
                 user_ratings += unrated_data
 
