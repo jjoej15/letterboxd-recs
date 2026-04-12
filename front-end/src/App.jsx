@@ -6,8 +6,7 @@ import githubLogo from './assets/github-mark.svg';
 import './css/App.css'
 import GenreDropdown from './components/GenreDropdown'
 
-// const API_BASE_URL = "https://clever-ambition-production.up.railway.app";
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = "https://clever-ambition-production.up.railway.app";
 
 function App() {
   const [mode, setMode] = useState('solo');
