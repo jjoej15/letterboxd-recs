@@ -4,6 +4,8 @@
 
 import asyncio
 import aiohttp
+import cloudscraper
+import re
 from bs4 import BeautifulSoup
 
 
@@ -30,14 +32,95 @@ genres = [
 ]
 
 
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9"
+}
+
+
+def _normalize_user_path(user):
+    user = (user or "").strip().strip('/')
+    return f'/{user}/' if user else '/'
+
+
+def _is_cloudflare_challenge(html):
+    if not html:
+        return False
+
+    html = html.lower()
+    return (
+        "just a moment" in html
+        or "cf_chl_opt" in html
+        or "enable javascript and cookies to continue" in html
+    )
+
+
+def _fetch_html_cloudscraper(url):
+    scraper = cloudscraper.create_scraper(
+        browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False}
+    )
+    response = scraper.get(url, headers=REQUEST_HEADERS, timeout=30)
+    return (response.status_code, response.text)
+
+
+def _extract_num_pages(soup):
+    paginate_pages = soup.find_all("li", class_="paginate-page")
+    if paginate_pages:
+        return int(paginate_pages[-1].find('a').text)
+
+    page_nums = []
+    for link in soup.find_all('a', href=True):
+        match = re.search(r'/page/(\d+)/', link['href'])
+        if match:
+            page_nums.append(int(match.group(1)))
+
+    return max(page_nums) if page_nums else 1
+
+
+def _extract_film_metadata(film):
+    film_info = film.find('div', attrs={'data-target-link': True})
+    if not film_info:
+        film_info = film.find('div', attrs={'data-item-link': True})
+
+    if not film_info:
+        return None
+
+    film_link = film_info.attrs.get('data-target-link') or film_info.attrs.get('data-item-link')
+
+    film_title = None
+    img = film_info.find('img')
+    if img:
+        film_title = img.attrs.get('alt')
+
+    if not film_title:
+        film_title = film_info.attrs.get('data-item-name') or film_info.attrs.get('data-item-full-display-name')
+
+    if not film_title or not film_link:
+        return None
+
+    return {'Film': film_title, 'Film Link': film_link}
+
+
 async def fetch_html(url, session):
     '''
         Takes in string representing url and aiohttp.ClientSession object.
         Returns tuple of response status and response text/html respectively.
     '''
 
-    async with session.get(url) as response:
-        return (response.status, await response.text())
+    try:
+        async with session.get(url, headers=REQUEST_HEADERS) as response:
+            html = await response.text()
+
+            # If Cloudflare challenge page is returned, switch to Cloudflare-aware client
+            if response.status in (403, 429, 503) and _is_cloudflare_challenge(html):
+                return await asyncio.to_thread(_fetch_html_cloudscraper, url)
+
+            return (response.status, html)
+
+    except Exception:
+        # Fallback if aiohttp request fails due anti-bot/network behavior.
+        return await asyncio.to_thread(_fetch_html_cloudscraper, url)
     
 
 async def get_num_film_pages(member, session):
@@ -46,6 +129,7 @@ async def get_num_film_pages(member, session):
         Returns integer representing number of pages necessary to scrape to collect all user ratings.
     '''    
 
+    member = _normalize_user_path(member)
     url = f'https://letterboxd.com{member}films/'
     (resp_code, html) = await fetch_html(url, session)
 
@@ -56,16 +140,16 @@ async def get_num_film_pages(member, session):
 
     try:
         if resp_code != 200:
-            raise Exception(f"Response code {resp_code}")
+            print(f"Error finding number of pages to scrape for member {member}: Response code {resp_code}")
+            return 0
 
         # Parsing page using BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
-        paginate_pages = soup.find_all("li", class_="paginate-page")
-
-        return int(paginate_pages[-1].find('a').text) if paginate_pages else 1
+        return _extract_num_pages(soup)
     
     except Exception as err:
         print(f"Error finding number of pages to scrape for member {member}: {err}")
+        return 0
 
 
 async def scrape_member_ratings(member, page, session):
@@ -74,6 +158,7 @@ async def scrape_member_ratings(member, page, session):
         Returns tuple of list of dicts representing user rated data and list of dict representings user unrated data respectively.
     '''  
 
+    member = _normalize_user_path(member)
     url = f'https://letterboxd.com{member}films/page/{page}/'
     (resp_code, html) = await (fetch_html(url, session))
 
@@ -89,18 +174,26 @@ async def scrape_member_ratings(member, page, session):
         # Parsing data using BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
         
-        films = soup.find_all("li", class_="griditem")   
+        films = soup.select("li.griditem, li.poster-container")
         for film in films:
-            rating_span = film.find('p').find('span')
+            film_data = _extract_film_metadata(film)
+            if not film_data:
+                continue
+
+            rating_span = film.select_one('p.poster-viewingdata span.rating, p span.rating')
 
             if rating_span: 
-                rating = rating_span.attrs['class'][-1].split('-')[1]
+                rated_class = next((class_name for class_name in rating_span.attrs.get('class', []) if class_name.startswith('rated-')), None)
+                rating = rated_class.split('-')[1] if rated_class else None
+
+                if not rating:
+                    continue
+
                 if rating != "16": # Add to rated data
                     item = {}
                     item['User'] = member
-                    film_info = film.find('div')
-                    item['Film'] = film_info.find('img').attrs['alt']
-                    item['Film Link'] = film_info.attrs['data-target-link']
+                    item['Film'] = film_data['Film']
+                    item['Film Link'] = film_data['Film Link']
                     item['Rating'] = rating
 
                     rated_data.append(item)
@@ -108,9 +201,8 @@ async def scrape_member_ratings(member, page, session):
                 else: # If got rating of 16, it means the user liked the film but didn't rate it. Add to unrated data.
                     item = {}
                     item['User'] = member
-                    film_info = film.find('div')
-                    item['Film'] = film_info.find('img').attrs['alt']
-                    item['Film Link'] = film_info.attrs['data-target-link']
+                    item['Film'] = film_data['Film']
+                    item['Film Link'] = film_data['Film Link']
 
                     unrated_data.append(item)                    
 
@@ -118,9 +210,8 @@ async def scrape_member_ratings(member, page, session):
             else: 
                 item = {}
                 item['User'] = member
-                film_info = film.find('div')
-                item['Film'] = film_info.find('img').attrs['alt']
-                item['Film Link'] = film_info.attrs['data-target-link']
+                item['Film'] = film_data['Film']
+                item['Film Link'] = film_data['Film Link']
 
                 unrated_data.append(item)
 
@@ -137,6 +228,7 @@ async def get_num_watchlist_pages(user, session):
         Returns number of pages in user's watchlist.
     '''
 
+    user = _normalize_user_path(user)
     url = f'https://letterboxd.com{user}watchlist/'
     (resp_code, html) = await fetch_html(url, session)
 
@@ -153,8 +245,7 @@ async def get_num_watchlist_pages(user, session):
     try:
         # Parsing data using BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
-        paginate_pages = soup.find_all("li", class_="paginate-page")
-        return int(paginate_pages[-1].find('a').text) if paginate_pages else 1
+        return _extract_num_pages(soup)
     
     except Exception as err:
         print(f"Error finding number of pages to scrape for user watchlist: {err}")
@@ -166,6 +257,7 @@ async def scrape_watchlist(user, page, session):
         Returns list of film hrefs from user's watchlist on given page.
     '''
 
+    user = _normalize_user_path(user)
     url = f'https://letterboxd.com{user}watchlist/page/{page}/'
     (resp_code, html) = await fetch_html(url, session)
 
@@ -178,9 +270,11 @@ async def scrape_watchlist(user, page, session):
         # Getting film info using BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
 
-        films = soup.find_all('li', class_='griditem')
+        films = soup.select('li.griditem, li.poster-container')
         for film in films:
-            film_links.append(film.find('div').attrs['data-target-link'])
+            film_data = _extract_film_metadata(film)
+            if film_data:
+                film_links.append(film_data['Film Link'])
 
     except Exception as err:
         print(f"Error scraping {user} watchlist page #{page}: {err}")
@@ -195,6 +289,7 @@ async def scrape_user_data(user, exclude_watchlist):
         Returns tuple with list of dicts representing user ratings and list of film href's from user's watchlist respectively.
     '''
 
+    user = _normalize_user_path(user)
     user_ratings = []
     user_watchlist = []
 
@@ -206,6 +301,10 @@ async def scrape_user_data(user, exclude_watchlist):
         # Getting number of pages user has filled with ratings
         tasks.append(get_num_film_pages(user, session))
         pages = (await asyncio.gather(*tasks))[0]
+
+        if not pages:
+            print(f"Couldn't scrape ratings pages for {user}. Check username or try again shortly.")
+            return ([], [])
 
         # Scraping user's ratings
         tasks = [] 

@@ -6,6 +6,8 @@ import githubLogo from './assets/github-mark.svg';
 import './css/App.css'
 import GenreDropdown from './components/GenreDropdown'
 
+// const API_BASE_URL = "https://clever-ambition-production.up.railway.app";
+const API_BASE_URL = "http://localhost:8080";
 
 function App() {
   const [mode, setMode] = useState('solo');
@@ -42,7 +44,7 @@ function App() {
       setErrOccured(false);
       setClicked(true);
 
-      const api_url = `https://clever-ambition-production.up.railway.app/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
+      const api_url = `${API_BASE_URL}/api/?users=${mode === 'blend' ? `${user1},${user2}` : user1}&excludeWatchlist=${excludeWatchlist}&popFilter=${popularityFilter}&genreFilters=${genreFilters}`
 
       const response = await fetch(api_url);
       const data = await response.json(); 

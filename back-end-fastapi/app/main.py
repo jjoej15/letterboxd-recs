@@ -31,7 +31,10 @@ async def get_recs(users: str, excludeWatchlist: str, popFilter: str, genreFilte
   
     parameters = {'users': users, 'excludeWatchlist': excludeWatchlist, 'popFilter': popFilter, 'genreFilters': genreFilters, 'blended': blended}
 
-    return await use_model.main(parameters)
+    try:
+        return await use_model.main(parameters)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
 
 
 if __name__ == '__main__':

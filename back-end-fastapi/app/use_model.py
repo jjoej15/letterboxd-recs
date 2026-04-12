@@ -187,10 +187,20 @@ async def main(parameters):
         filter_dict['Genre'] = parameters['genreFilters']
   
     (ratings, user_1_watchlist) = await scraping.scrape_user_data(user_1, exclude_watchlist)
+    if not ratings:
+        raise ValueError(
+            f"Could not scrape ratings for user {user_1.strip('/')}. The user may be private, invalid, or temporarily blocked by Letterboxd."
+        )
+
     watchlists = [user_1_watchlist] if user_1_watchlist else []
 
     if blend_mode:
         (user_2_ratings, user_2_watchlist) = await scraping.scrape_user_data(user_2, exclude_watchlist)
+        if not user_2_ratings:
+            raise ValueError(
+                f"Could not scrape ratings for user {user_2.strip('/')}. The user may be private, invalid, or temporarily blocked by Letterboxd."
+            )
+
         watchlists.append(user_2_watchlist)
 
         ratings = get_blended_ratings(ratings, user_2_ratings, algo)
